@@ -37,7 +37,7 @@ class PublicRedirectView(APIView):
 
 
 class PrivateRedirectView(APIView):
-    """Resolve a private identifier and 302-redirect (any authenticated user; no owner check)."""
+    """Resolve any identifier and 302-redirect (authenticated; private + public fallback)."""
 
     permission_classes = [IsAuthenticated]
 

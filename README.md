@@ -36,9 +36,11 @@ password: admin12345
   `nanoid`, and the target URL is validated against an `http`/`https` allowlist (blocks
   `javascript:`, `data:`, …). You only ever see and touch your own rules — someone else's rule
   returns **404**, not 403, so the API never reveals that it exists.
-- **Redirection.** `GET`/`HEAD` `/redirect/public/<id>/` is open to everyone; `/redirect/private/<id>/`
-  requires any authenticated user. Both answer `302` to the target (302, not 301, so changing the
-  target isn't cached by browsers); a wrong or mismatched identifier is a clean `404`.
+- **Redirection.** `GET`/`HEAD` `/redirect/public/<id>/` is open to everyone and resolves only
+  public rules. `/redirect/private/<id>/` requires any authenticated user and resolves **any**
+  rule — private ones plus public ones as a fallback (an authenticated user can follow any
+  redirect). Both answer `302` to the target (302, not 301, so changing the target isn't cached by
+  browsers); a wrong or mismatched identifier is a clean `404`.
 - **Rate limiting (two layers).** nginx `limit_req` throttles by IP at the edge (flood protection
   before requests even reach Django), and DRF throttles the token endpoints and public redirects
   with counters kept in Redis.
@@ -132,22 +134,27 @@ Or just open the Swagger UI at <https://redirect-service.pp.ua/api/docs/> and tr
 ### 2) Run locally (uv)
 
 For development you need Python 3.14 (via [uv](https://docs.astral.sh/uv/)) and a Postgres + Redis.
-The quickest way to get the databases is a couple of throwaway containers:
+Bring the databases up with Compose (only the `db` + `redis` services) — they read their
+credentials from your `.env`, so there are no flags to keep in sync:
 
 ```bash
 uv sync
+cp .env.example .env                          # sane local defaults are already filled in
 
-docker run -d --name rs-pg -e POSTGRES_DB=redirect -e POSTGRES_USER=redirect \
-  -e POSTGRES_PASSWORD=redirect -p 5432:5432 postgres:17-alpine
-docker run -d --name rs-redis -p 6379:6379 redis:8-alpine
+# Postgres + Redis on localhost:5432 / :6379, all vars pulled from .env
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db redis
 
-cp .env.example .env                         # sane local defaults are already filled in
 uv run python src/manage.py migrate
-uv run python src/manage.py createsuperuser   # or rely on DJANGO_SUPERUSER_* from .env
-uv run python src/manage.py runserver         # http://127.0.0.1:8000/
+uv run python src/manage.py createsuperuser    # or rely on DJANGO_SUPERUSER_* from .env
+uv run python src/manage.py runserver          # http://127.0.0.1:8000/
 ```
 
-Tear the databases down with `docker rm -f rs-pg rs-redis` when you're done.
+> The app itself runs on the host via `uv run` — the `dev` overlay is used here only because
+> it's what publishes the Postgres/Redis ports to `localhost` (the base compose keeps them
+> internal so prod never exposes the DB). We only start `db` + `redis`, not the `web` service.
+
+Tear the databases down with
+`docker compose -f docker-compose.yml -f docker-compose.dev.yml down` when you're done.
 
 ### 3) Run with Docker Compose
 
@@ -193,7 +200,7 @@ All authenticated endpoints expect `Authorization: Bearer <access>`.
 | GET / POST | `/url/` | Bearer | List your rules (paginated) / create one |
 | GET / PATCH / DELETE | `/url/<uuid:id>/` | Bearer | Retrieve / update / delete your rule (no `PUT`) |
 | GET / HEAD | `/redirect/public/<id>/` | — | `302` to the target (IP rate-limited) |
-| GET / HEAD | `/redirect/private/<id>/` | Bearer | `302` to the target (any authenticated user) |
+| GET / HEAD | `/redirect/private/<id>/` | Bearer | `302` to the target — any rule (private + public fallback) |
 | GET | `/health/` | — | Liveness + DB ping |
 | GET | `/api/docs/` | — | Swagger UI (`/api/schema/` for the raw OpenAPI) |
 

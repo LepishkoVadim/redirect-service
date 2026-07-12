@@ -17,9 +17,11 @@ def test_private_rule_via_public_is_404(api_client, private_rule):
 
 
 @pytest.mark.django_db
-def test_public_rule_via_private_is_404(auth_client, rule):
+def test_public_rule_via_private_302(auth_client, rule):
+    # Authenticated users may follow public rules through the private endpoint (fallback).
     resp = auth_client.get(f"/redirect/private/{rule.redirect_identifier}/")
-    assert resp.status_code == 404
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == rule.redirect_url
 
 
 @pytest.mark.django_db
