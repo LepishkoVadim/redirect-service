@@ -1,4 +1,4 @@
-# redirect-service
+# redirect-service 
 
 A small but production-shaped URL redirect service built with Django 6 and Django REST
 Framework. You register **redirect rules** — each gets a short, auto-generated identifier — and
