@@ -1,0 +1,1 @@
+"""Redirect module: resolve an identifier to a 302 with public/private access rules."""

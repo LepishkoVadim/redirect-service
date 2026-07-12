@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Django
+staticfiles/
+*.sqlite3
+
+# Env (keep .env.example)
+.env
+
+# Logs (keep the directory via .gitkeep)
+logs/*
+!logs/.gitkeep
+
+# Tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Terraform: track the .tf sources; state/tfvars/keys are ignored by terraform/.gitignore
