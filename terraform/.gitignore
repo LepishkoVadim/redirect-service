@@ -1,0 +1,15 @@
+# Local state (this setup uses local state) and backups
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.tfstate.lock.info
+
+# Variables that may hold overrides / secrets
+terraform.tfvars
+*.auto.tfvars
+
+# Private keys, if any land here
+*.pem
+
+# Keep: .terraform.lock.hcl (provider pinning is committed)
+!.terraform.lock.hcl

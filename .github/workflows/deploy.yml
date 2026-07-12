@@ -1,0 +1,95 @@
+# CI/CD: on every push/PR to main run the quality gate (ruff + mypy + pytest against
+# ephemeral Postgres/Redis service containers); on push to main, deploy to the EC2 host
+# over SSH (git pull → rebuild the prod compose stack → smoke-test /health/).
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: redirect
+          POSTGRES_USER: redirect
+          POSTGRES_PASSWORD: redirect
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U redirect"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (pins Python from .python-version)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint (ruff)
+        run: uv run ruff check src
+
+      - name: Type check (mypy)
+        run: uv run mypy src
+
+      - name: Tests (pytest)
+        run: uv run pytest
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      # Pull the latest code and rebuild the prod stack on the EC2 host, then smoke-test.
+      # `ubuntu` isn't in the docker group, and /opt/redirect-service is root-owned → sudo.
+      # The TLS overlay is included so redeploys keep HTTPS on :443 — it reuses the cert
+      # already in the `certbot-etc` volume (bootstrapped once with docker/init-letsencrypt.sh;
+      # nginx starts straight from the existing cert and certbot renews it in the background).
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/redirect-service
+            sudo git pull origin main
+            COMPOSE="sudo docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.tls.yml"
+            $COMPOSE up -d --build
+            # `up` recreates `web` (new container IP) but not `nginx`, which caches the old
+            # upstream IP → 502. Restart nginx so it re-resolves `web` and re-reads its config.
+            $COMPOSE restart nginx
+            # Smoke-test HTTPS with the real domain cert (resolve to loopback), retrying up to
+            # ~3 min while web finishes booting after the rebuild (slow on a t3.small).
+            for i in $(seq 1 36); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' \
+                --resolve redirect-service.pp.ua:443:127.0.0.1 \
+                https://redirect-service.pp.ua/health/ || true)
+              [ "$code" = "200" ] && { echo "healthy"; exit 0; }
+              echo "waiting for web ($i/36): $code"; sleep 5
+            done
+            echo "health check failed after ~3 min"; exit 1

@@ -1,0 +1,24 @@
+# Dev overlay: live-reload runserver on :8000, local settings, DB/Redis exposed to host.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+services:
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  web:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "*"
+    # Dev entrypoint runs migrate + runserver (autoreload) instead of gunicorn.
+    entrypoint: ["/app/docker/entrypoint.dev.sh"]
+    volumes:
+      # Live code reload — host source shadows the image's /app/src.
+      - ./src:/app/src
+      - logs:/app/logs
+    ports:
+      - "8000:8000"

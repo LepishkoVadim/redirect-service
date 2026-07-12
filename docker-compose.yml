@@ -1,0 +1,54 @@
+# Base stack (db + redis + web common bits). Always used with an overlay:
+#   dev:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   prod: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-redirect}
+      POSTGRES_USER: ${POSTGRES_USER:-redirect}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-redirect}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-redirect}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:8-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      # Named volume (not bind mount): Docker initializes it as app:app so the non-root
+      # user can write; avoids host-uid mismatch. Persists logs across restarts.
+      - logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # /health/ pings the DB; SECURE_REDIRECT_EXEMPT keeps it reachable over plain HTTP
+      # inside the network even when SSL-redirect is on. start_period covers migrate/collectstatic.
+      test: ["CMD", "python", "-c",
+             "import urllib.request;urllib.request.urlopen('http://localhost:8000/health/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+volumes:
+  pgdata:
+  logs:

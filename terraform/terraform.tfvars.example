@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and adjust. All values have sensible defaults in variables.tf.
+region              = "eu-central-1"
+aws_profile         = "redirect-service"
+instance_type       = "t3.small"
+repo_url            = "https://github.com/LepishkoVadim/redirect-service.git"
+repo_branch         = "main"
+ssh_public_key_path = "~/.ssh/lepishko.pub"
+
+# Lock SSH down to your IP for real use, e.g.:
+# ssh_ingress_cidr = "203.0.113.10/32"
+
+# Django admin bootstrap — the single source of truth for deploy (written into the
+# instance .env by user_data). Set a strong password here for a real deployment.
+superuser_username = "admin"
+superuser_password = "admin12345"
+superuser_email    = "admin@example.com"
+domain             = "redirect-service.pp.ua"

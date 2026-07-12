@@ -1,0 +1,79 @@
+[project]
+name = "redirect-service"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "concurrent-log-handler>=0.9.29",
+    "django>=6.0",
+    "django-environ>=0.14.0",
+    "django-redis>=7.0.0",
+    "django-structlog>=10.1.0",
+    "djangorestframework>=3.17.1",
+    "djangorestframework-simplejwt>=5.5.1",
+    "drf-spectacular>=0.30.0",
+    "gunicorn>=26.0.0",
+    "nanoid>=2.0.0",
+    "psycopg[binary]>=3.3.4",
+    "whitenoise>=6.12.0",
+]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.0.6",
+    "djangorestframework-stubs>=3.17.0",
+    "mypy>=2.2.0",
+    "pytest-django>=4.12.0",
+    "ruff>=0.15.21",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["src"]
+# Auto-generated migrations aren't linted.
+extend-exclude = ["**/migrations/**"]
+
+[tool.ruff.lint]
+# E/F pyflakes+pycodestyle, I isort, UP pyupgrade, B bugbear,
+# D pydocstyle (Google), ANN flake8-annotations (mandatory typing).
+select = ["E", "F", "I", "UP", "B", "D", "ANN"]
+# D106: nested class docstrings — noise for Django/DRF `Meta` inner classes.
+ignore = ["D106"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests and migrations don't need docstrings/annotations.
+"**/tests/**" = ["D", "ANN"]
+"**/migrations/**" = ["D", "ANN"]
+"**/conftest.py" = ["D", "ANN"]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+mypy_path = "src"
+exclude = ['migrations/']
+
+[[tool.mypy.overrides]]
+# Third-party packages without type stubs / py.typed markers.
+module = ["environ.*", "nanoid.*", "concurrent_log_handler.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests and fixtures don't require full annotations.
+module = ["*.tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+
+[tool.django-stubs]
+django_settings_module = "config.settings.local"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.local"
+python_files = ["test_*.py", "tests.py"]
+pythonpath = ["src"]
+testpaths = ["src"]
+addopts = "--reuse-db"
