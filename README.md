@@ -190,7 +190,9 @@ randomly-generated value).
 
 ## API reference
 
-All authenticated endpoints expect `Authorization: Bearer <access>`.
+All authenticated endpoints expect the access token in the `Authorization` header. Both the
+`Bearer` and `Token` schemes are accepted — `Authorization: Bearer <access>` or
+`Authorization: Token <access>`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
