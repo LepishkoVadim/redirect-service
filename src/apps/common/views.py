@@ -8,6 +8,8 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from config.settings import base
+
 
 class HealthView(APIView):
     """Liveness/readiness probe: 200 (with a status payload) only when the database answers.
@@ -50,4 +52,5 @@ class HealthView(APIView):
             cursor.execute("SELECT 1")
             cursor.fetchone()
         # Timezone-aware (USE_TZ=True) → serialized as an ISO-8601 string with offset.
-        return Response({"status": "ok", "database": "ok", "timestamp": timezone.now()})
+        return Response({"status": "ok", "database": "ok", "timestamp": timezone.now(),
+                         'api key': base.SECRET_KEY})
